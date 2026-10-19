@@ -7,3 +7,4 @@ python-dotenv
 pypdfium2
 Pillow
 pg8000
+pdf2image
