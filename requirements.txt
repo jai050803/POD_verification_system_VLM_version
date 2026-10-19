@@ -9,3 +9,4 @@ Pillow
 pg8000
 pdf2image
 numpy
+requests

@@ -7,6 +7,16 @@ from app.services.classifier import (
     detect_document_type,
     compute_triage_stage,
 )
+from app.services.vlm import (
+    PROMPTS,
+    POD_VLM_PROMPT,
+    DL_VLM_PROMPT,
+    RC_VLM_PROMPT,
+    BILTI_VLM_PROMPT,
+    call_gemini_vlm,
+    call_ollama_vlm,
+    extract_vlm,
+)
 
 __all__ = [
     "ingest",
@@ -17,4 +27,12 @@ __all__ = [
     "assess_document_quality",
     "detect_document_type",
     "compute_triage_stage",
+    "PROMPTS",
+    "POD_VLM_PROMPT",
+    "DL_VLM_PROMPT",
+    "RC_VLM_PROMPT",
+    "BILTI_VLM_PROMPT",
+    "call_gemini_vlm",
+    "call_ollama_vlm",
+    "extract_vlm",
 ]
