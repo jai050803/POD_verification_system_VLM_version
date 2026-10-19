@@ -19,6 +19,7 @@ from app.services.vlm import (
 )
 from app.services.extractor import extract_fields, run_extractor
 from app.services.reconciler import reconcile, build_final_result
+from app.services.webhook import deliver_webhook, deliver_webhook_error
 
 __all__ = [
     "ingest",
@@ -41,4 +42,6 @@ __all__ = [
     "run_extractor",
     "reconcile",
     "build_final_result",
+    "deliver_webhook",
+    "deliver_webhook_error",
 ]
