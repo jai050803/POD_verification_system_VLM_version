@@ -18,6 +18,7 @@ from app.services.vlm import (
     extract_vlm,
 )
 from app.services.extractor import extract_fields, run_extractor
+from app.services.reconciler import reconcile, build_final_result
 
 __all__ = [
     "ingest",
@@ -38,4 +39,6 @@ __all__ = [
     "extract_vlm",
     "extract_fields",
     "run_extractor",
+    "reconcile",
+    "build_final_result",
 ]
