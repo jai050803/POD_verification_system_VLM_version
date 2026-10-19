@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+python-multipart
+pydantic-settings
+httpx
+python-dotenv
+pypdfium2
+Pillow
+pg8000
