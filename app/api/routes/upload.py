@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile, status
 
 from app.api.dependencies import validate_upload_file
 from app.queue.job_store import job_store
-from app.queue.worker import processing_queue
+from app.queue.worker import enqueue, processing_queue
 from app.schemas.upload import UploadResponse
 
 router = APIRouter(tags=["Upload"])
@@ -48,7 +48,7 @@ async def upload_document(
     }
 
     try:
-        processing_queue.put_nowait(task_payload)
+        await enqueue(task_payload)
     except asyncio.QueueFull:
         job_store.set_failed(job_id, "Processing queue full, retry later")
         raise HTTPException(
