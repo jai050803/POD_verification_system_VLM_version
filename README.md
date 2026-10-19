@@ -8,8 +8,12 @@ An asynchronous multimodal document verification and intelligence service design
 
 | Variable | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `GEMINI_API_KEY` | `str` | `""` | Google Gemini API Key for VLM visual auditing. |
-| `GEMINI_MODEL` | `str` | `gemini-2.0-flash` | Primary Gemini model identifier for vision inference. |
+| `GEMINI_API_KEY` | `str` | `""` | Primary Google Gemini API Key for VLM visual auditing. |
+| `GEMINI_API_KEY_1` | `str` | `""` | Gemini API Key fallback 1 (if primary is exhausted / rate-limited). |
+| `GEMINI_API_KEY_2` | `str` | `""` | Gemini API Key fallback 2. |
+| `GEMINI_API_KEY_3` | `str` | `""` | Gemini API Key fallback 3. |
+| `GEMINI_API_KEY_4` | `str` | `""` | Gemini API Key fallback 4. |
+| `GEMINI_MODEL` | `str` | `gemini-3.5-flash` | Primary Gemini model identifier for vision inference. |
 | `VLM_PROVIDER` | `str` | `gemini` | Multimodal provider: `gemini` or `ollama`. |
 | `OLLAMA_MODEL` | `str` | `qwen2.5-vl:7b` | Model name when running local Ollama inference. |
 | `MAX_FILE_SIZE_MB` | `int` | `10` | Maximum upload file size in megabytes. |

@@ -16,10 +16,13 @@ from __future__ import annotations
 import base64
 import io
 import json
+import logging
 import os
 import re
 from typing import Any, Dict, List, Optional, Tuple, Union
 from PIL import Image
+
+logger = logging.getLogger(__name__)
 
 try:
     from dotenv import load_dotenv
@@ -260,30 +263,51 @@ def call_gemini_vlm(
     model_name: Optional[str] = None,
     timeout: int = 75,
 ) -> Dict[str, Any]:
-    """Call Google Gemini Vision API using REST generateContent with structured output and automatic fallback."""
+    """Call Google Gemini Vision API using REST generateContent with structured output,
+    multi-key failover rotation, and candidate model fallback."""
     import requests
 
-    key = api_key or os.environ.get("GEMINI_API_KEY")
-    if not key:
-        raise ValueError("GEMINI_API_KEY is not configured in environment or .env file.")
+    # Build key pool from explicit argument, settings, and environment variables
+    keys_to_try: List[str] = []
+    if api_key and api_key.strip():
+        keys_to_try.append(api_key.strip())
 
-    primary_model = model_name or os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
-    candidate_models = []
+    try:
+        from app.config import get_settings
+        for k in get_settings().gemini_api_keys:
+            if k and k not in keys_to_try:
+                keys_to_try.append(k)
+    except Exception:
+        pass
+
+    for env_var in (
+        "GEMINI_API_KEY",
+        "GEMINI_API_KEY_1",
+        "GEMINI_API_KEY_2",
+        "GEMINI_API_KEY_3",
+        "GEMINI_API_KEY_4",
+    ):
+        val = os.environ.get(env_var, "").strip()
+        if val and val not in keys_to_try:
+            keys_to_try.append(val)
+
+    if not keys_to_try:
+        raise ValueError("No GEMINI_API_KEY configured in environment or .env file.")
+
+    primary_model = model_name or os.environ.get("GEMINI_MODEL", "gemini-3.5-flash")
+    candidate_models: List[str] = []
     for m in [
         primary_model,
-        "gemini-2.0-flash",
+        "gemini-3.5-flash",
         "gemini-2.5-flash",
+        "gemini-2.0-flash",
+        "gemini-flash-latest",
         "gemini-1.5-flash",
     ]:
         if m and m not in candidate_models:
             candidate_models.append(m)
 
     b64_image = _pil_to_base64_jpeg(image)
-
-    headers = {
-        "Content-Type": "application/json",
-        "X-goog-api-key": key,
-    }
 
     payload = {
         "contents": [
@@ -301,39 +325,69 @@ def call_gemini_vlm(
     }
 
     last_error = None
-    for cur_model in candidate_models:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{cur_model}:generateContent"
-        try:
-            resp = requests.post(url, headers=headers, json=payload, timeout=timeout)
-            if resp.status_code == 200:
-                data = resp.json()
-                candidates = data.get("candidates", [])
-                if not candidates:
-                    raise RuntimeError(f"No candidates returned by Gemini: {data}")
 
-                parts = candidates[0].get("content", {}).get("parts", [])
-                if not parts:
-                    raise RuntimeError(f"Empty content parts from Gemini: {data}")
+    for key_idx, key in enumerate(keys_to_try, start=1):
+        masked_key = f"...{key[-6:]}" if len(key) >= 6 else "***"
+        headers = {
+            "Content-Type": "application/json",
+            "X-goog-api-key": key,
+        }
 
-                raw_text = parts[0].get("text", "")
-                parsed_json = _clean_json_response(raw_text)
+        for cur_model in candidate_models:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{cur_model}:generateContent"
+            try:
+                resp = requests.post(url, headers=headers, json=payload, timeout=timeout)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    candidates = data.get("candidates", [])
+                    if not candidates:
+                        raise RuntimeError(f"No candidates returned by Gemini: {data}")
 
-                return {
-                    "provider": "gemini",
-                    "model": cur_model,
-                    "raw_text": raw_text,
-                    "structured": parsed_json,
-                }
-            elif resp.status_code in (429, 404, 503):
-                last_error = f"HTTP {resp.status_code} ({cur_model}): {resp.text}"
+                    parts = candidates[0].get("content", {}).get("parts", [])
+                    if not parts:
+                        raise RuntimeError(f"Empty content parts from Gemini: {data}")
+
+                    raw_text = parts[0].get("text", "")
+                    parsed_json = _clean_json_response(raw_text)
+
+                    return {
+                        "provider": "gemini",
+                        "model": cur_model,
+                        "raw_text": raw_text,
+                        "structured": parsed_json,
+                        "key_used": masked_key,
+                    }
+                is_key_error = (
+                    resp.status_code in (429, 401, 403)
+                    or (resp.status_code == 400 and ("API key" in resp.text or "API_KEY" in resp.text))
+                )
+                if is_key_error:
+                    # Rate limit / Quota exceeded / Auth or invalid key error -> switch to next fallback key
+                    last_error = f"HTTP {resp.status_code} on key {masked_key} with model {cur_model}: {resp.text}"
+                    logger.warning(
+                        "Gemini API key %s (key %d of %d) failed with HTTP %d on model %s. Switching to fallback key.",
+                        masked_key,
+                        key_idx,
+                        len(keys_to_try),
+                        resp.status_code,
+                        cur_model,
+                    )
+                    break
+                elif resp.status_code in (404, 400):
+                    # Model not found or model error -> try next candidate model with same key
+                    last_error = f"HTTP {resp.status_code} ({cur_model}) on key {masked_key}: {resp.text}"
+                    continue
+                elif resp.status_code == 503:
+                    last_error = f"HTTP 503 Service Unavailable ({cur_model}) on key {masked_key}: {resp.text}"
+                    continue
+                else:
+                    last_error = f"HTTP {resp.status_code} ({cur_model}) on key {masked_key}: {resp.text}"
+                    continue
+            except requests.exceptions.RequestException as e:
+                last_error = f"Network/timeout error on key {masked_key} with model {cur_model}: {str(e)}"
                 continue
-            else:
-                raise RuntimeError(f"Gemini API returned HTTP {resp.status_code}: {resp.text}")
-        except requests.exceptions.RequestException as e:
-            last_error = f"Network/timeout error on {cur_model}: {str(e)}"
-            continue
 
-    raise RuntimeError(f"All Gemini candidate models failed. Last error: {last_error}")
+    raise RuntimeError(f"All Gemini API keys and candidate models failed. Last error: {last_error}")
 
 
 def call_ollama_vlm(
@@ -409,8 +463,25 @@ def extract_vlm(
 
     active_provider = provider or os.environ.get("VLM_PROVIDER", "gemini").lower()
 
-    # If Gemini is requested or GEMINI_API_KEY is set
-    if active_provider == "gemini" or (os.environ.get("GEMINI_API_KEY") and active_provider != "ollama"):
+    # Check if Gemini key is configured
+    has_gemini_key = False
+    try:
+        from app.config import get_settings
+        has_gemini_key = len(get_settings().gemini_api_keys) > 0
+    except Exception:
+        has_gemini_key = any(
+            bool(os.environ.get(k, "").strip())
+            for k in (
+                "GEMINI_API_KEY",
+                "GEMINI_API_KEY_1",
+                "GEMINI_API_KEY_2",
+                "GEMINI_API_KEY_3",
+                "GEMINI_API_KEY_4",
+            )
+        )
+
+    # If Gemini is requested or Gemini key is configured
+    if active_provider == "gemini" or (has_gemini_key and active_provider != "ollama"):
         try:
             res = call_gemini_vlm(image, prompt=active_prompt)
             return {

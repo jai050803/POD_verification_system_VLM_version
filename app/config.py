@@ -6,6 +6,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):   
     GEMINI_API_KEY: str = ""
+    GEMINI_API_KEY_1: str = ""
+    GEMINI_API_KEY_2: str = ""
+    GEMINI_API_KEY_3: str = ""
+    GEMINI_API_KEY_4: str = ""
     GEMINI_MODEL: str = "gemini-3.5-flash"
     VLM_PROVIDER: str = "gemini"
     OLLAMA_MODEL: str = "qwen2.5-vl:7b"
@@ -15,6 +19,21 @@ class Settings(BaseSettings):
     WEBHOOK_TIMEOUT_SECONDS: int = 10
     ALLOWED_EXTENSIONS: Union[list[str], str] = ["jpg", "jpeg", "png", "webp", "pdf"]
     DATABASE_URL: Optional[str] = "postgresql://postgres:2301420045@localhost:5432/pod_verification"
+
+    @property
+    def gemini_api_keys(self) -> list[str]:
+        """Returns list of configured non-empty Gemini API keys in priority order."""
+        keys = []
+        for k in [
+            self.GEMINI_API_KEY,
+            self.GEMINI_API_KEY_1,
+            self.GEMINI_API_KEY_2,
+            self.GEMINI_API_KEY_3,
+            self.GEMINI_API_KEY_4,
+        ]:
+            if k and k.strip() and k.strip() not in keys:
+                keys.append(k.strip())
+        return keys
 
     @field_validator("ALLOWED_EXTENSIONS", mode="before")
     @classmethod

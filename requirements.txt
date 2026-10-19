@@ -10,3 +10,4 @@ pg8000
 pdf2image
 numpy
 requests
+ollama>=0.6.0
