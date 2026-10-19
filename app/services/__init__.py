@@ -17,6 +17,7 @@ from app.services.vlm import (
     call_ollama_vlm,
     extract_vlm,
 )
+from app.services.extractor import extract_fields, run_extractor
 
 __all__ = [
     "ingest",
@@ -35,4 +36,6 @@ __all__ = [
     "call_gemini_vlm",
     "call_ollama_vlm",
     "extract_vlm",
+    "extract_fields",
+    "run_extractor",
 ]
