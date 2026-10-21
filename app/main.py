@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import health_router, jobs_router, upload_router
 from app.middleware.error_handler import ErrorHandlerMiddleware
@@ -32,6 +33,15 @@ app = FastAPI(
     version="1.0.0",
     description="Asynchronous document processing backend for Proof of Delivery (POD) verification.",
     lifespan=lifespan,
+)
+
+# CORS middleware for local frontend dashboard communication
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Middleware stack

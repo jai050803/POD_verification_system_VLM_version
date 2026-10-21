@@ -4,7 +4,7 @@ from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class Settings(BaseSettings):   
+class Settings(BaseSettings):
     GEMINI_API_KEY: str = ""
     GEMINI_API_KEY_1: str = ""
     GEMINI_API_KEY_2: str = ""
@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     WEBHOOK_RETRY_COUNT: int = 3
     WEBHOOK_TIMEOUT_SECONDS: int = 10
     ALLOWED_EXTENSIONS: Union[list[str], str] = ["jpg", "jpeg", "png", "webp", "pdf"]
-    DATABASE_URL: Optional[str] = "postgresql://postgres:2301420045@localhost:5432/pod_verification"
+    DATABASE_URL: Optional[str] = None
 
     @property
     def gemini_api_keys(self) -> list[str]:
